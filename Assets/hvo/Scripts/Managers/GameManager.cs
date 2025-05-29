@@ -1,10 +1,15 @@
 using System.Numerics;
 using UnityEngine;
 using UnityEngine.InputSystem;
+using Quaternion = UnityEngine.Quaternion;
 using Vector2 = UnityEngine.Vector2;
+using Vector3 = UnityEngine.Vector3;
 
 public class GameManager : SingletonManager<GameManager>
 {
+    [Header("UI")]
+    [SerializeField]
+    private PointToClick m_pointToClickPrefab;
 
     public Unit ActiveUnit;
     private Vector2 m_InitialTouchPosition;
@@ -35,6 +40,8 @@ public class GameManager : SingletonManager<GameManager>
         Vector2 worldPoint = Camera.main.ScreenToWorldPoint(inputPosition);
         RaycastHit2D hit = Physics2D.Raycast(worldPoint, Vector2.zero);
 
+        Debug.Log(worldPoint);
+
         if (HasClickOnUnit(hit, out var unit))
         {
             HandleClickOnUnit(unit);
@@ -60,11 +67,28 @@ public class GameManager : SingletonManager<GameManager>
 
     void HandleClickOnGround(Vector2 worldPoint)
     {
-        ActiveUnit.MoveTo(worldPoint);
+        //Debug.Log(worldPoint);
+
+        if (HasActiveUnit && IsHumanoid(ActiveUnit))
+        {
+            DisplayClickEffect(worldPoint);
+            ActiveUnit.MoveTo(worldPoint);
+        }
+
+
     }
 
     void HandleClickOnUnit(Unit unit)
     {
+        if (HasActiveUnit)
+        {
+            if (HasClickedOnActiveUnit(unit))
+            {
+                CancelActiveUnit();
+                return;
+            }
+            
+        }
         SelectNewUnit(unit);
     }
 
@@ -77,6 +101,29 @@ public class GameManager : SingletonManager<GameManager>
         }
         ActiveUnit = unit;
         ActiveUnit.Select();
+    }
+
+    bool HasClickedOnActiveUnit(Unit clickedUnit)
+    {
+        return clickedUnit == ActiveUnit;
+    }
+
+    bool IsHumanoid(Unit unit)
+    {
+        return unit is HumanoidUnit;
+    }
+
+    void CancelActiveUnit()
+    {
+        ActiveUnit.Deselect();
+        ActiveUnit = null;
+
+    }
+
+    void DisplayClickEffect(Vector2 worldPoint)
+    {
+
+        Instantiate(m_pointToClickPrefab, (Vector3)worldPoint, Quaternion.identity);
     }
 
 }
