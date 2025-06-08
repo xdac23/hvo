@@ -1,5 +1,6 @@
 using System.Numerics;
 using UnityEngine;
+using UnityEngine.EventSystems;
 using UnityEngine.InputSystem;
 using Quaternion = UnityEngine.Quaternion;
 using Vector2 = UnityEngine.Vector2;
@@ -10,37 +11,46 @@ public class GameManager : SingletonManager<GameManager>
     [Header("UI")]
     [SerializeField]
     private PointToClick m_pointToClickPrefab;
+    [SerializeField] private ActionBar m_actionBar;
 
     public Unit ActiveUnit;
     private Vector2 m_InitialTouchPosition;
+    public Vector2 InputPosition => Input.touchCount > 0 ? Input.GetTouch(0).position : Input.mousePosition;
+    public bool IsLeftClickOrTapDown => Input.GetMouseButtonDown(0) || (Input.touchCount > 0 && Input.GetTouch(0).phase == UnityEngine.TouchPhase.Began);
+    public bool IsLeftClickOrTapUp => Input.GetMouseButtonUp(0) || (Input.touchCount > 0 && Input.GetTouch(0).phase == UnityEngine.TouchPhase.Ended);
 
     public bool HasActiveUnit => ActiveUnit != null;
+
+    void Start()
+    {
+        ClearActionBarUI();
+
+    }
     void Update()
     {
-        // Check for touch the screen or mouse position
-        Vector2 inputPosition = Input.touchCount > 0 ? Input.GetTouch(0).position : Input.mousePosition;
-
-        if (Input.GetMouseButtonDown(0) || (Input.touchCount > 0 && Input.GetTouch(0).phase == UnityEngine.TouchPhase.Ended))
+        
+        if (IsLeftClickOrTapDown)
         {
-            m_InitialTouchPosition = inputPosition;
+            m_InitialTouchPosition = InputPosition;
         }
 
-        // If the left mouse button is release or a touch ends, call DetectClick
-        if (Input.GetMouseButtonUp(0) || (Input.touchCount > 0 && Input.GetTouch(0).phase == UnityEngine.TouchPhase.Began))
+        if (IsLeftClickOrTapUp)
         {
 
-            if (Vector2.Distance(m_InitialTouchPosition, inputPosition) < 10)
+            if (Vector2.Distance(m_InitialTouchPosition, InputPosition) < 5)
             {
-                DetectClick(inputPosition);
+                DetectClick(InputPosition);
             }
         }
     }
     void DetectClick(Vector2 inputPosition)
     {
+        if (isPointerOverUIElement())
+        {
+            return;
+        }
         Vector2 worldPoint = Camera.main.ScreenToWorldPoint(inputPosition);
         RaycastHit2D hit = Physics2D.Raycast(worldPoint, Vector2.zero);
-
-        Debug.Log(worldPoint);
 
         if (HasClickOnUnit(hit, out var unit))
         {
@@ -87,7 +97,7 @@ public class GameManager : SingletonManager<GameManager>
                 CancelActiveUnit();
                 return;
             }
-            
+
         }
         SelectNewUnit(unit);
     }
@@ -101,6 +111,7 @@ public class GameManager : SingletonManager<GameManager>
         }
         ActiveUnit = unit;
         ActiveUnit.Select();
+        ShowUnitActions();
     }
 
     bool HasClickedOnActiveUnit(Unit clickedUnit)
@@ -117,13 +128,45 @@ public class GameManager : SingletonManager<GameManager>
     {
         ActiveUnit.Deselect();
         ActiveUnit = null;
-
+        ClearActionBarUI();        
     }
 
     void DisplayClickEffect(Vector2 worldPoint)
     {
 
         Instantiate(m_pointToClickPrefab, (Vector3)worldPoint, Quaternion.identity);
+    }
+
+    void ShowUnitActions()
+    {
+        ClearActionBarUI();
+
+        var hardcodedActions = 2;
+
+        for (int i = 0; i < hardcodedActions; i++)
+        {
+            m_actionBar.RegisterAction();
+        }
+        m_actionBar.Show();
+    }
+
+    void ClearActionBarUI()
+    {
+        m_actionBar.ClearActions();
+        m_actionBar.Hide();
+    }
+
+    bool isPointerOverUIElement()
+    {
+        if (Input.touchCount > 0)
+        {
+            var touch = Input.GetTouch(0);
+            return EventSystem.current.IsPointerOverGameObject(touch.fingerId);
+        }
+        else
+        {
+            return EventSystem.current.IsPointerOverGameObject();
+        }
     }
 
 }
